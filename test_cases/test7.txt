@@ -1,0 +1,7 @@
+4 6
+seattle portland 2.5
+seattle boise 7.9
+seattle spokane 4.3
+portland boise 5.2
+portland spokane 6.8
+boise spokane 2.4
