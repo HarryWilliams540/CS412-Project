@@ -2,7 +2,7 @@
 # 11/18/2025
 
 #!/bin/bash
-for file in ../test_cases/*; do
+for file in test_cases/*; do
     echo "Running $file..."
 
     start_time=$(date +%s%3N)
