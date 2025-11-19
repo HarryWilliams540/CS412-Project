@@ -1,0 +1,7 @@
+4 6
+aa bb 1.111
+aa cc 2.543
+aa dd 0.900
+bb cc 3.333
+bb dd 2.222
+cc dd 4.444
