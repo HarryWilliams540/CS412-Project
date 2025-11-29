@@ -1,0 +1,5 @@
+bash approx_solution/test_cases/run_test_cases.sh
+bash approx_solution/test_cases/run_nonopt_cases.sh
+bash approx_solution/test_cases/compute_approx_wallclock.sh
+
+head approx_solution/test_cases/wallclock_results.csv

@@ -1,10 +1,19 @@
 """
 Approximation Algorithm for TSP (Greedy Nearest Neighbor + 2-opt with random restarts)
 John Henry Adams, Dylan Dao, Harry Williams
+
+Enhancements (instrumentation & configurability):
+- Optional command line flag --time-limit <seconds>
+- Optional command line flag --seed <int> (or env var TSP_SEED)
+- Deterministic seeding for reproducibility when desired
+- Optional restart/debug stats printed to stderr when env var TSP_DEBUG is set
+Output to stdout remains exactly two lines per spec: cost (4 decimals) then tour.
 """
 import math
 import random
 import time
+import os
+import sys
 
 
 def greedy_tsp(dist, start=0):
