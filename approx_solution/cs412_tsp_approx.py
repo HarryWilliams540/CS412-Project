@@ -1,5 +1,5 @@
 """
-Approximation Algorithm for TSP (Nearest Neighbor + 2-opt with random restarts)
+Approximation Algorithm for TSP (Greedy Nearest Neighbor + 2-opt with random restarts)
 John Henry Adams, Dylan Dao, Harry Williams
 """
 import math
@@ -50,56 +50,44 @@ def two_opt(dist, path):
             a, b = route[i], route[(i + 1) % n]
             for j in range(i + 2, n if i > 0 else n - 1):
                 c, d = route[j], route[(j + 1) % n]
-                if dist[a][c] + dist[b][d] < dist[a][b] + dist[c][d] - 1e-12:
+                
+                current_cost = dist[a][b] + dist[c][d]
+                new_cost = dist[a][c] + dist[b][d]
+                
+                # If swapping improves, reverse segment
+                if new_cost < current_cost - 1e-12:
                     route[i + 1:j + 1] = reversed(route[i + 1:j + 1])
                     improved = True
                     break
             if improved:
                 break
+    
     return route + [route[0]]
 
 
 def solve_with_restarts(dist, time_limit=1.8, k_starts=20, log_series_path=None, seed=412):
     n = len(dist)
-    random.seed(seed)
-    t0 = time.time()
-    deadline = t0 + max(0.01, time_limit)
+    start_time = time.time()
+    
     best_cost = math.inf
     best_path = None
-
-    starts = [0]
-    if n > 1:
-        # Sample without replacement; if k_starts > n fall back to full range
-        extra = min(k_starts - 1, n - 1)
-        starts += random.sample(range(1, n), extra)
-
-    log = open(log_series_path, "w") if log_series_path else None
-    if log:
-        log.write("t_ms,run_idx,start_node,before_cost,after_cost,improve,improve_ratio,local_min,best_so_far,best_per_node\n")
-
-    for run_idx, start in enumerate(starts):
-        if time.time() >= deadline:
-            break
-        _, path = greedy_tsp(dist, start)
-        before = sum(dist[path[i]][path[i+1]] for i in range(n))
-        path = two_opt(dist, path)
-        after = sum(dist[path[i]][path[i+1]] for i in range(n))
-        improve = before - after
-        improve_ratio = improve / before if before > 0 else 0.0
-        local_min = int(after >= before - 1e-12)
-        if after < best_cost - 1e-12:
-            best_cost, best_path = after, path
-        if log:
-            t_ms = int((time.time() - t0) * 1000)
-            log.write(f"{t_ms},{run_idx},{start},{before:.6f},{after:.6f},{improve:.6f},{improve_ratio:.6f},{local_min},{best_cost:.6f},{(best_cost/n):.6f}\n")
-
-    if log:
-        log.close()
-
-    if best_path is None:
-        best_cost, best_path = greedy_tsp(dist, 0)
-        best_path = two_opt(dist, best_path)
-        best_cost = sum(dist[best_path[i]][best_path[i+1]] for i in range(n))
+    
+    while time.time() - start_time < time_limit:
+        # Random starting node
+        start_node = random.randint(0, n - 1)
+        cost, path = greedy_tsp(dist, start_node)
+        
+        # Apply 2-opt local search
+        improved_path = two_opt(dist, path)
+        
+        # Calculate improved cost
+        improved_cost = sum(dist[improved_path[i]][improved_path[i+1]] 
+                          for i in range(len(improved_path) - 1))
+        
+        if improved_cost < best_cost:
+            best_cost = improved_cost
+            best_path = improved_path
+    
     return best_cost, best_path
 
 def read_complete_graph(stdin):
@@ -121,6 +109,7 @@ def read_complete_graph(stdin):
     dist = [[math.inf] * n for _ in range(n)]
     for i in range(n):
         dist[i][i] = 0.0
+    
     for a, b, w in edges:
         i, j = names[a], names[b]
         dist[i][j] = dist[j][i] = w
