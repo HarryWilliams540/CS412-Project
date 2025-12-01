@@ -109,8 +109,7 @@ def one_tree_lower_bound(D):
     return best
 
 
-# -------- main program --------
 if __name__ == "__main__":
     n, D = read_graph()
     lb = one_tree_lower_bound(D)
-    print("1-tree lower bound:", lb)
+    print(f"1-tree lower bound: {lb:.4f}")
