@@ -1,131 +1,171 @@
 """
-Approximation Algorithm for TSP (Greedy Nearest Neighbor + 2-opt with random restarts)
-John Henry Adams, Dylan Dao, Harry Williams
+Approximation Algorithm for TSP (Greedy Nearest Neighbor + 2-opt with Anytime Restarts)
+CS 412 Project
 """
-import math
-import random
-import time
+
 import sys
-
-
-def greedy_tsp(dist, start=0):
-    n = len(dist)
-    visited = [False] * n
-    current = start
-    visited[current] = True
-    path = [current]
-    cost = 0.0
-
-    for _ in range(n - 1):
-        best = math.inf
-        ties = []
-        for v in range(n):
-            if not visited[v]:
-                d = dist[current][v]
-                if d < best - 1e-12:
-                    best = d
-                    ties = [v]
-                elif abs(d - best) <= 1e-12:
-                    ties.append(v)
-        nxt = random.choice(ties)
-        visited[nxt] = True
-        path.append(nxt)
-        cost += best
-        current = nxt
-
-    cost += dist[current][start]
-    path.append(start)
-    return cost, path
-
-
-def two_opt(dist, path):
-    """In-place 2-opt on a cycle. Returns improved cycle path (last equals first)."""
-    n = len(path) - 1
-    route = path[:-1]
-    improved = True
-
-    while improved:
-        improved = False
-        for i in range(n - 1):
-            a, b = route[i], route[(i + 1) % n]
-            for j in range(i + 2, n if i > 0 else n - 1):
-                c, d = route[j], route[(j + 1) % n]
-                
-                current_cost = dist[a][b] + dist[c][d]
-                new_cost = dist[a][c] + dist[b][d]
-                
-                # If swapping improves, reverse segment
-                if new_cost < current_cost - 1e-12:
-                    route[i + 1:j + 1] = reversed(route[i + 1:j + 1])
-                    improved = True
-                    break
-            if improved:
-                break
-    
-    return route + [route[0]]
-
-
-def solve_with_restarts(dist, time_limit=1.8, k_starts=20, log_series_path=None, seed=412):
-    n = len(dist)
-    start_time = time.time()
-    
-    best_cost = math.inf
-    best_path = None
-    
-    while time.time() - start_time < time_limit:
-        # Random starting node
-        start_node = random.randint(0, n - 1)
-        cost, path = greedy_tsp(dist, start_node)
-        
-        # Apply 2-opt local search
-        improved_path = two_opt(dist, path)
-        
-        # Calculate improved cost
-        improved_cost = sum(dist[improved_path[i]][improved_path[i+1]] 
-                          for i in range(len(improved_path) - 1))
-        
-        if improved_cost < best_cost:
-            best_cost = improved_cost
-            best_path = improved_path
-    
-    return best_cost, best_path
+import math
+import time
+import random
 
 def read_complete_graph(stdin):
-    header = stdin.readline().strip()
-    if not header:
-        raise ValueError("Empty input")
-    _, m = map(int, header.split())
-    edges = []
-    names = {}
-    for _ in range(m):
-        a, b, w = stdin.readline().split()
-        edges.append((a, b, float(w)))
-        if a not in names:
-            names[a] = len(names)
-        if b not in names:
-            names[b] = len(names)
+    """Reads a complete graph from stdin. Returns distance matrix and name map."""
+    try:
+        header = stdin.readline().split()
+        if not header: return None, None
+        n, m = int(header[0]), int(header[1])
 
-    n = len(names)
-    dist = [[math.inf] * n for _ in range(n)]
-    for i in range(n):
-        dist[i][i] = 0.0
+        names = {}
+        dist = [[0.0] * n for _ in range(n)]
+        next_idx = 0
+
+        for _ in range(m):
+            parts = stdin.readline().split()
+            u, v, w = parts[0], parts[1], float(parts[2])
+            
+            if u not in names:
+                names[u] = next_idx
+                next_idx += 1
+            if v not in names:
+                names[v] = next_idx
+                next_idx += 1
+            
+            i, j = names[u], names[v]
+            dist[i][j] = dist[j][i] = w
+            
+        return dist, names
+    except ValueError:
+        return None, None
+
+def greedy_tsp(dist, start_node):
+    """Constructs a greedy tour from start_node."""
+    n = len(dist)
+    visited = [False] * n
+    path = [start_node]
+    visited[start_node] = True
+    cost = 0.0
+    current = start_node
+
+    for _ in range(n - 1):
+        best_next = -1
+        min_dist = math.inf
+        
+        for neighbor in range(n):
+            if not visited[neighbor]:
+                d = dist[current][neighbor]
+                if d < min_dist:
+                    min_dist = d
+                    best_next = neighbor
+                elif d == min_dist:
+                    # Random tie-breaking
+                    if random.random() < 0.5:
+                        best_next = neighbor
+        
+        visited[best_next] = True
+        path.append(best_next)
+        cost += min_dist
+        current = best_next
+
+    cost += dist[current][start_node]
+    path.append(start_node)
+    return cost, path
+
+def calculate_path_cost(dist, path):
+    return sum(dist[path[i]][path[i+1]] for i in range(len(path)-1))
+
+def two_opt(dist, path):
+    """
+    Performs 2-opt local search to improve the tour.
+    Iterates until no improving swap is found (local minimum).
+    """
+    n = len(path) - 1 # path has n+1 nodes (start repeated)
+    improved = True
+    best_path = path[:]
     
-    for a, b, w in edges:
-        i, j = names[a], names[b]
-        dist[i][j] = dist[j][i] = w
-    return dist, names
+    while improved:
+        improved = False
+        # Iterate over all possible segments to swap
+        for i in range(1, n - 1):
+            for j in range(i + 1, n):
+                if j - i == 1: continue # Skip adjacent edges
+                
+                # Nodes involved in the swap
+                u, v = best_path[i-1], best_path[i]
+                x, y = best_path[j], best_path[j+1]
+                
+                # Check if swap reduces length
+                current_dist = dist[u][v] + dist[x][y]
+                new_dist = dist[u][x] + dist[v][y]
+                
+                if new_dist < current_dist:
+                    # Perform the swap: reverse segment [i, j]
+                    best_path[i:j+1] = best_path[i:j+1][::-1]
+                    improved = True
+                    
+    return best_path
 
+def solve_with_restarts(dist, time_limit=1.8, k_starts=20, log_series_path=None, seed=412):
+    """
+    Anytime algorithm: Runs Greedy + 2-Opt with random restarts.
+    Stops when time_limit expires or k_starts is reached.
+    """
+    n = len(dist)
+    random.seed(seed)
+    start_time = time.time()
+    deadline = start_time + time_limit
+
+    best_cost = math.inf
+    best_path = None
+
+    log_file = open(log_series_path, "w") if log_series_path else None
+    if log_file:
+        log_file.write("t_ms,run_idx,start_node,greedy_cost,localsearch_cost,improve,best_so_far\n")
+
+    start_nodes = [0]
+    if n > 1:
+        pool = list(range(1, n))
+        count = min(k_starts - 1, len(pool))
+        start_nodes += random.sample(pool, count)
+
+    for run_idx, start_node in enumerate(start_nodes):
+        if time.time() >= deadline:
+            break
+
+        g_cost, g_path = greedy_tsp(dist, start_node)
+
+        ls_path = two_opt(dist, g_path)
+        ls_cost = calculate_path_cost(dist, ls_path)
+
+        if ls_cost < best_cost:
+            best_cost = ls_cost
+            best_path = ls_path
+
+        # Log Data
+        if log_file:
+            t_ms = int((time.time() - start_time) * 1000)
+            improve = g_cost - ls_cost
+            log_file.write(f"{t_ms},{run_idx},{start_node},{g_cost:.4f},{ls_cost:.4f},{improve:.4f},{best_cost:.4f}\n")
+
+    if log_file:
+        log_file.close()
+
+    # Fallback if loop didn't run
+    if best_path is None:
+        return greedy_tsp(dist, 0)
+
+    return best_cost, best_path
 
 def main():
-    TIME_LIMIT = 1.8
-    K_STARTS = 20
-
     dist, names = read_complete_graph(sys.stdin)
-    cost, path = solve_with_restarts(dist, time_limit=TIME_LIMIT, k_starts=K_STARTS)
-    idx_to_name = {v: k for k, v in names.items()}
+    if dist is None:
+        return
 
+    cost, path = solve_with_restarts(dist, time_limit=1.9, k_starts=50)
     print(f"{cost:.4f}")
-    print(" ".join(idx_to_name[i] for i in path))
+    
+    idx_to_name = {v: k for k, v in names.items()}
+    path_names = [idx_to_name[i] for i in path]
+    print(" ".join(path_names))
 
 if __name__ == "__main__":
     main()
