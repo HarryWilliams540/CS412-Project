@@ -156,11 +156,21 @@ def solve_with_restarts(dist, time_limit=1.8, k_starts=20, log_series_path=None,
     return best_cost, best_path
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--time", type=float, default=1.9)
+    parser.add_argument("--starts", type=int, default=50)
+    args = parser.parse_args()
+
     dist, names = read_complete_graph(sys.stdin)
     if dist is None:
         return
 
-    cost, path = solve_with_restarts(dist, time_limit=1.9, k_starts=50)
+    cost, path = solve_with_restarts(
+        dist,
+        time_limit=args.time,
+        k_starts=args.starts
+    )
     print(f"{cost:.4f}")
     
     idx_to_name = {v: k for k, v in names.items()}
