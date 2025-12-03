@@ -1,20 +1,9 @@
-# John Henry Adams
-# 11/18/2025
+for file in $(ls test_cases | sort -V); do
+    file="test_cases/$file"
+    filename=$(basename "$file")
 
-#!/bin/bash
+    echo "Running $filename..."
 
-OUTPUT_FILE="tsp_runtime_results.csv"
-
-# Write CSV header
-echo "test_case,input_size,runtime_ms" > "$OUTPUT_FILE"
-
-# Sort files numerically (case_1, case_2, ..., case_20)
-for filename in $(ls test_cases | sort -V); do
-    file="tsp_test_cases/$filename"
-
-    echo "Running $file..."
-
-    # Extract input size (first number in file)
     input_size=$(head -n 1 "$file" | awk '{print $1}')
 
     start_time=$(date +%s%3N)
@@ -26,8 +15,5 @@ for filename in $(ls test_cases | sort -V); do
     echo "Complete in $elapsed_time ms"
     echo "----------------------------"
 
-    # Append to CSV
-    echo "$filename,$input_size,$elapsed_time" >> "$OUTPUT_FILE"
+    echo "$filename,$input_size,$elapsed_time" >> tsp_runtime_results.csv
 done
-
-echo "Results saved to $OUTPUT_FILE"
